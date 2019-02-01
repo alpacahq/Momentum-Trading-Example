@@ -1,0 +1,6 @@
+runtime: python37
+entrypoint: python algo.py
+env_variables:
+  APCA_API_BASE_URL: https://paper-api.alpaca.markets
+  APCA_API_KEY_ID: <your key ID here>
+  APCA_API_SECRET_KEY: <your secret key here>

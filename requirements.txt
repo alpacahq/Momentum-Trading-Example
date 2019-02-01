@@ -1,0 +1,4 @@
+alpaca-trade-api
+TA-Lib
+numpy
+pytz
