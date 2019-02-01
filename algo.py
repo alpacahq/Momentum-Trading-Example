@@ -10,10 +10,16 @@ api = tradeapi.REST()
 
 session = requests.session()
 
+# We only consider stocks with per-share prices inside this range
 min_share_price = 2.0
 max_share_price = 13.0
-min_last_dollar_volume = 10000000
+# Minimum previous-day dollar volume for a stock we might consider
+min_last_dv = 10000000
+# Stop limit to default to
+default_stop = .95
+# How much of our portfolio to allocate to any one position
 risk = 0.001
+
 
 def get_1000m_history_data(symbols):
     print('Getting historical data...')
@@ -23,9 +29,10 @@ def get_1000m_history_data(symbols):
         minute_history[symbol] = api.polygon.historic_agg(
             size="minute", symbol=symbol, limit=1000
         ).df
-        c+=1
+        c += 1
     print('Success.')
     return minute_history
+
 
 def get_tickers():
     print('Getting current ticker data...')
@@ -33,14 +40,14 @@ def get_tickers():
     print('Success.')
     assets = api.list_assets()
     symbols = [asset.symbol for asset in assets if asset.tradable]
-    return [ticker for ticker in tickers
-        if ticker['ticker'] in symbols
-            and ticker['lastTrade']['p'] >= min_share_price
-            and ticker['lastTrade']['p'] <= max_share_price
-            and ticker['prevDay']['v'] * ticker['lastTrade']['p']
-                > min_last_dollar_volume
-            and ticker['todaysChangePerc'] >= 3.5
-    ]
+    return [ticker for ticker in tickers if (
+        ticker['ticker'] in symbols and
+        ticker['lastTrade']['p'] >= min_share_price and
+        ticker['lastTrade']['p'] <= max_share_price and
+        ticker['prevDay']['v'] * ticker['lastTrade']['p'] > min_last_dv and
+        ticker['todaysChangePerc'] >= 3.5
+    )]
+
 
 def get_market_open():
     nyc = timezone('America/New_York')
@@ -51,6 +58,7 @@ def get_market_open():
         seconds=current_dt.second
     )
 
+
 def find_stop(current_value, minute_history, now):
     series = minute_history['low'][-100:] \
                 .dropna().resample('5min').min()
@@ -59,7 +67,8 @@ def find_stop(current_value, minute_history, now):
     low_index = np.where((diff[:-1] <= 0) & (diff[1:] > 0))[0] + 1
     if len(low_index) > 0:
         return series[low_index[-1]] - 0.01
-    return current_value * 0.95
+    return current_value * default_stop
+
 
 def run(tickers):
     # Establish streaming connection
@@ -97,7 +106,9 @@ def run(tickers):
             positions[position.symbol] = float(position.qty)
             # Recalculate cost basis and stop price
             latest_cost_basis[position.symbol] = float(position.cost_basis)
-            stop_prices[position.symbol] = float(position.cost_basis) * .95
+            stop_prices[position.symbol] = (
+                float(position.cost_basis) * default_stop
+            )
 
     # Keep track of what we're buying/selling
     target_prices = {}
@@ -142,11 +153,11 @@ def run(tickers):
         ts = data.start
         ts -= timedelta(seconds=ts.second, microseconds=ts.microsecond)
         try:
-            current_data = minute_history[data.symbol].loc[ts]
+            current = minute_history[data.symbol].loc[ts]
         except KeyError:
-            current_data = None
+            current = None
         new_data = []
-        if current_data is None:
+        if current is None:
             new_data = [
                 data.open,
                 data.high,
@@ -156,11 +167,11 @@ def run(tickers):
             ]
         else:
             new_data = [
-                current_data.open,
-                data.high if data.high > current_data.high else current_data.high,
-                data.low if data.low < current_data.low else current_data.low,
+                current.open,
+                data.high if data.high > current.high else current.high,
+                data.low if data.low < current.low else current.low,
                 data.close,
-                current_data.volume + data.volume
+                current.volume + data.volume
             ]
         minute_history[symbol].loc[ts] = new_data
 
@@ -180,8 +191,8 @@ def run(tickers):
         # Now we check to see if it might be time to buy or sell
         since_market_open = ts - get_market_open()
         if (
-            since_market_open.seconds // 60 > 15
-            and since_market_open.seconds // 60 < 60
+            since_market_open.seconds // 60 > 15 and
+            since_market_open.seconds // 60 < 60
         ):
             # Check for buy signals
 
@@ -196,21 +207,30 @@ def run(tickers):
             high_15m = minute_history[symbol][lbound:ubound]['high'].max()
 
             # Get the change since yesterday's market close
-            daily_pct_change = ((data.close - prev_closes[symbol])
-                                / prev_closes[symbol])
+            daily_pct_change = (
+                (data.close - prev_closes[symbol]) / prev_closes[symbol]
+            )
             if (
-                daily_pct_change > .04
-                and data.close > high_15m
-                and volume_today[symbol] > 30000
+                daily_pct_change > .04 and
+                data.close > high_15m and
+                volume_today[symbol] > 30000
             ):
                 # check for a positive, increasing MACD
-                hist = macd(minute_history[symbol]['close'].dropna(), n_fast=12, n_slow=26)
+                hist = macd(
+                    minute_history[symbol]['close'].dropna(),
+                    n_fast=12,
+                    n_slow=26
+                )
                 if (
-                    hist[-1] < 0
-                    or not (hist[-3] < hist[-2] < hist[-1])
+                    hist[-1] < 0 or
+                    not (hist[-3] < hist[-2] < hist[-1])
                 ):
                     return
-                hist = macd(minute_history[symbol]['close'].dropna(), n_fast=40, n_slow=60)
+                hist = macd(
+                    minute_history[symbol]['close'].dropna(),
+                    n_fast=40,
+                    n_slow=60
+                )
                 if hist[-1] < 0 or np.diff(hist)[-1] < 0:
                     return
 
@@ -243,8 +263,8 @@ def run(tickers):
                     print(e)
                 return
         if(
-            since_market_open.seconds // 60 >= 24
-            and since_market_open.seconds // 60 < 360
+            since_market_open.seconds // 60 >= 24 and
+            since_market_open.seconds // 60 < 360
         ):
             # Check for liquidation signals
 
@@ -256,13 +276,15 @@ def run(tickers):
             # Sell for a loss if it's fallen below our stop price
             # Sell for a loss if it's below our cost basis and MACD < 0
             # Sell for a profit if it's above our target price
-            hist = macd(minute_history[symbol]['close'].dropna(), n_fast=13, n_slow=21)
+            hist = macd(
+                minute_history[symbol]['close'].dropna(),
+                n_fast=13,
+                n_slow=21
+            )
             if (
-                data.close <= stop_prices[symbol]
-                or (data.close >= target_prices[symbol]
-                    and hist[-1] <= 0)
-                or (data.close <= latest_cost_basis[symbol]
-                    and hist[-1] <= 0)
+                data.close <= stop_prices[symbol] or
+                (data.close >= target_prices[symbol] and hist[-1] <= 0) or
+                (data.close <= latest_cost_basis[symbol] and hist[-1] <= 0)
             ):
                 try:
                     o = api.submit_order(
@@ -297,6 +319,7 @@ def run(tickers):
     print('Watching {} symbols.'.format(len(symbols)))
     run_ws(conn, channels)
 
+
 # Handle failed websocket connections by reconnecting
 def run_ws(conn, channels):
     try:
@@ -306,9 +329,9 @@ def run_ws(conn, channels):
         conn.close
         run_ws(conn, channels)
 
-if __name__ == "__main__":
 
-    # Wait until after we might want to trade
+if __name__ == "__main__":
+    # Wait until just before we might want to trade
     nyc = timezone('America/New_York')
     current_dt = datetime.today().astimezone(nyc)
     since_market_open = current_dt - get_market_open
