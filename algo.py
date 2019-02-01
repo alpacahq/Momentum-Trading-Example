@@ -6,7 +6,16 @@ import numpy as np
 from datetime import datetime, timedelta
 from pytz import timezone
 
-api = tradeapi.REST()
+# Replace these with your API connection info from the dashboard
+base_url = 'https://paper-api.alpaca.markets'
+api_key_id = 'PKA8AAZ10ZOEPVQUTRE1'
+api_secret = 'v4o2T8EWEMPMMy3mShwM1PtC4G1/Ss/BzmoQdrgg'
+
+api = tradeapi.REST(
+    base_url=base_url,
+    key_id=api_key_id,
+    secret_key=api_secret
+)
 
 session = requests.session()
 
@@ -49,16 +58,6 @@ def get_tickers():
     )]
 
 
-def get_market_open():
-    nyc = timezone('America/New_York')
-    current_dt = datetime.today().astimezone(nyc)
-    return current_dt - timedelta(
-        hours=current_dt.hour-9,
-        minutes=current_dt.minute-30,
-        seconds=current_dt.second
-    )
-
-
 def find_stop(current_value, minute_history, now):
     series = minute_history['low'][-100:] \
                 .dropna().resample('5min').min()
@@ -70,9 +69,9 @@ def find_stop(current_value, minute_history, now):
     return current_value * default_stop
 
 
-def run(tickers):
+def run(tickers, market_open_dt):
     # Establish streaming connection
-    conn = tradeapi.StreamConn()
+    conn = tradeapi.StreamConn(key_id=api_key_id, secret_key=api_secret)
 
     # Update initial state with information from tickers
     volume_today = {}
@@ -189,7 +188,7 @@ def run(tickers):
             return
 
         # Now we check to see if it might be time to buy or sell
-        since_market_open = ts - get_market_open()
+        since_market_open = ts - market_open_dt
         if (
             since_market_open.seconds // 60 > 15 and
             since_market_open.seconds // 60 < 60
@@ -202,8 +201,8 @@ def run(tickers):
                 return
 
             # See how high the price went during the first 15 minutes
-            lbound = get_market_open()
-            ubound = lbound.replace(minute=45)
+            lbound = market_open_dt
+            ubound = lbound + timedelta(minutes=15)
             high_15m = minute_history[symbol][lbound:ubound]['high'].max()
 
             # Get the change since yesterday's market close
@@ -333,9 +332,11 @@ def run_ws(conn, channels):
 if __name__ == "__main__":
     # Wait until just before we might want to trade
     nyc = timezone('America/New_York')
+    market_open = api.get_clock().next_open
+    market_open = market_open.astimezone(nyc)
     current_dt = datetime.today().astimezone(nyc)
-    since_market_open = current_dt - get_market_open
+    since_market_open = current_dt - market_open
     while since_market_open.seconds // 60 <= 14:
         time.sleep(1)
 
-    run(get_tickers())
+    run(get_tickers(), market_open)
