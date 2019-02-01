@@ -16,6 +16,7 @@ min_last_dollar_volume = 10000000
 risk = 0.001
 
 def get_1000m_history_data(symbols):
+    print('Getting historical data...')
     minute_history = {}
     c = 0
     for symbol in symbols:
@@ -23,12 +24,13 @@ def get_1000m_history_data(symbols):
             size="minute", symbol=symbol, limit=1000
         ).df
         c+=1
-        print('{}/{}'.format(c, len(symbols)))
+    print('Success.')
     return minute_history
 
 def get_tickers():
+    print('Getting current ticker data...')
     tickers = api.polygon.all_tickers()['tickers']
-    print('got tickers')
+    print('Success.')
     assets = api.list_assets()
     symbols = [asset.symbol for asset in assets if asset.tradable]
     return [ticker for ticker in tickers
@@ -135,7 +137,6 @@ def run(tickers):
     @conn.on(r'A\..*')
     async def handle_second_bar(conn, channel, data):
         symbol = data.symbol
-        print('reading for {}'.format(symbol))
 
         # First, aggregate 1s bars for up-to-date MACD calculations
         ts = data.start
@@ -180,9 +181,8 @@ def run(tickers):
         since_market_open = ts - get_market_open()
         if (
             since_market_open.seconds // 60 > 15
-            #and since_market_open.seconds // 60 < 120
+            and since_market_open.seconds // 60 < 60
         ):
-            print('reading symbol {}'.format(symbol))
             # Check for buy signals
 
             # See if we've already bought in first
@@ -205,7 +205,6 @@ def run(tickers):
             ):
                 # check for a positive, increasing MACD
                 hist = macd(minute_history[symbol]['close'].dropna(), n_fast=12, n_slow=26)
-                print(hist)
                 if (
                     hist[-1] < 0
                     or not (hist[-3] < hist[-2] < hist[-1])
@@ -295,6 +294,7 @@ def run(tickers):
     for symbol in symbols:
         symbol_channels = ['A.{}'.format(symbol), 'AM.{}'.format(symbol)]
         channels += symbol_channels
+    print('Watching {} symbols.'.format(len(symbols)))
     run_ws(conn, channels)
 
 # Handle failed websocket connections by reconnecting
