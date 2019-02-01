@@ -1,7 +1,7 @@
 import alpaca_trade_api as tradeapi
 import requests
 import time
-import talib
+from ta import macd
 import numpy as np
 from datetime import datetime, timedelta
 from pytz import timezone
@@ -180,7 +180,7 @@ def run(tickers):
         since_market_open = ts - get_market_open()
         if (
             since_market_open.seconds // 60 > 15
-            and since_market_open.seconds // 60 < 120
+            #and since_market_open.seconds // 60 < 120
         ):
             print('reading symbol {}'.format(symbol))
             # Check for buy signals
@@ -203,22 +203,15 @@ def run(tickers):
                 and data.close > high_15m
                 and volume_today[symbol] > 30000
             ):
-                # TODO check that bars aren't too thin (i.e. bars exist for at least 70% of minutes since open)
-
                 # check for a positive, increasing MACD
-                macd_raw, signal, hist = talib.MACD(
-                    minute_history[symbol]['close'].dropna().values, fastperiod=13,
-                    slowperiod=21, signalperiod=8
-                )
+                hist = macd(minute_history[symbol]['close'].dropna(), n_fast=12, n_slow=26)
+                print(hist)
                 if (
                     hist[-1] < 0
                     or not (hist[-3] < hist[-2] < hist[-1])
                 ):
                     return
-                macd_raw, signal, hist = talib.MACD(
-                    minute_history[symbol]['close'].dropna().values, fastperiod=40,
-                    slowperiod=60, signalperiod=20
-                )
+                hist = macd(minute_history[symbol]['close'].dropna(), n_fast=40, n_slow=60)
                 if hist[-1] < 0 or np.diff(hist)[-1] < 0:
                     return
 
@@ -264,14 +257,11 @@ def run(tickers):
             # Sell for a loss if it's fallen below our stop price
             # Sell for a loss if it's below our cost basis and MACD < 0
             # Sell for a profit if it's above our target price
-            macd_raw, signal, hist = talib.MACD(
-                minute_history[symbol]['close'].dropna().values, fastperiod=13,
-                slowperiod=21, signalperiod=8
-            )
+            hist = macd(minute_history[symbol]['close'].dropna(), n_fast=13, n_slow=21)
             if (
                 data.close <= stop_prices[symbol]
                 or (data.close >= target_prices[symbol]
-                    and macd_raw[-1] <= 0)
+                    and hist[-1] <= 0)
                 or (data.close <= latest_cost_basis[symbol]
                     and hist[-1] <= 0)
             ):
@@ -305,7 +295,7 @@ def run(tickers):
     for symbol in symbols:
         symbol_channels = ['A.{}'.format(symbol), 'AM.{}'.format(symbol)]
         channels += symbol_channels
-    conn.run(channels)
+    run_ws(conn, channels)
 
 # Handle failed websocket connections by reconnecting
 def run_ws(conn, channels):
@@ -317,4 +307,12 @@ def run_ws(conn, channels):
         run_ws(conn, channels)
 
 if __name__ == "__main__":
+
+    # Wait until after we might want to trade
+    nyc = timezone('America/New_York')
+    current_dt = datetime.today().astimezone(nyc)
+    since_market_open = current_dt - get_market_open
+    while since_market_open.seconds // 60 <= 14:
+        time.sleep(1)
+
     run(get_tickers())
