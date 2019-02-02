@@ -7,9 +7,9 @@ from datetime import datetime, timedelta
 from pytz import timezone
 
 # Replace these with your API connection info from the dashboard
-base_url = 'Your URL endpoint'
-api_key_id = 'Your key ID'
-api_secret = 'Your secret key'
+base_url = 'Your API URL'
+api_key_id = 'Your API key'
+api_secret = 'Your API secret'
 
 api = tradeapi.REST(
     base_url=base_url,
@@ -45,16 +45,16 @@ def get_1000m_history_data(symbols):
 
 def get_tickers():
     print('Getting current ticker data...')
-    tickers = api.polygon.all_tickers()['tickers']
+    tickers = api.polygon.all_tickers()
     print('Success.')
     assets = api.list_assets()
     symbols = [asset.symbol for asset in assets if asset.tradable]
     return [ticker for ticker in tickers if (
-        ticker['ticker'] in symbols and
-        ticker['lastTrade']['p'] >= min_share_price and
-        ticker['lastTrade']['p'] <= max_share_price and
-        ticker['prevDay']['v'] * ticker['lastTrade']['p'] > min_last_dv and
-        ticker['todaysChangePerc'] >= 3.5
+        ticker.ticker in symbols and
+        ticker.lastTrade['p'] >= min_share_price and
+        ticker.lastTrade['p'] <= max_share_price and
+        ticker.prevDay['v'] * ticker.lastTrade['p'] > min_last_dv and
+        ticker.todaysChangePerc >= 3.5
     )]
 
 
@@ -77,11 +77,11 @@ def run(tickers, market_open_dt):
     volume_today = {}
     prev_closes = {}
     for ticker in tickers:
-        symbol = ticker['ticker']
-        prev_closes[symbol] = ticker['prevDay']['c']
-        volume_today[symbol] = ticker['day']['v']
+        symbol = ticker.ticker
+        prev_closes[symbol] = ticker.prevDay['c']
+        volume_today[symbol] = ticker.day['v']
 
-    symbols = [ticker['ticker'] for ticker in tickers]
+    symbols = [ticker.ticker for ticker in tickers]
     minute_history = get_1000m_history_data(symbols)
 
     portfolio_value = float(api.get_account().portfolio_value)
