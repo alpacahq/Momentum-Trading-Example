@@ -308,8 +308,8 @@ def run(tickers, market_open_dt):
                     api.cancel_order(order.id)
 
             # Liquidate remaining positions on watched symbols at market
-            positions = api.list_positions()
-            for position in existing_positions:
+            open_positions = api.list_positions()
+            for position in open_positions:
                 if position.symbol in symbols:
                     api.submit_order(
                         symbol=symbol, qty=str(position.qty), side='sell',
