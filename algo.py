@@ -8,8 +8,8 @@ from pytz import timezone
 
 # Replace these with your API connection info from the dashboard
 base_url = 'Your API URL'
-api_key_id = 'Your API key'
-api_secret = 'Your API secret'
+api_key_id = 'Your API Key'
+api_secret = 'Your API Secret'
 
 api = tradeapi.REST(
     base_url=base_url,
@@ -39,6 +39,7 @@ def get_1000m_history_data(symbols):
             size="minute", symbol=symbol, limit=1000
         ).df
         c += 1
+        print('{}/{}'.format(c, len(symbols)))
     print('Success.')
     return minute_history
 
@@ -82,6 +83,7 @@ def run(tickers, market_open_dt):
         volume_today[symbol] = ticker.day['v']
 
     symbols = [ticker.ticker for ticker in tickers]
+    print('Tracking {} symbols.'.format(len(symbols)))
     minute_history = get_1000m_history_data(symbols)
 
     portfolio_value = float(api.get_account().portfolio_value)
@@ -299,25 +301,26 @@ def run(tickers, market_open_dt):
         elif (
             since_market_open.seconds // 60 >= 359
         ):
-            print('Trading over, liquidating remaining positions...')
-
-            # Cancel any existing open orders on watched symbols
-            existing_orders = api.list_orders(limit=500)
-            for order in existing_orders:
-                if order.symbol in symbols:
-                    api.cancel_order(order.id)
-
             # Liquidate remaining positions on watched symbols at market
-            open_positions = api.list_positions()
-            for position in open_positions:
-                if position.symbol in symbols:
-                    api.submit_order(
-                        symbol=symbol, qty=str(position.qty), side='sell',
-                        type='market', time_in_force='day'
-                    )
-
-            print('Execution complete.')
-            conn.close()
+            try:
+                position = api.get_position(symbol)
+            except Exception as e:
+                # Exception here indicates that we have no position
+                return
+            print('Trading over, liquidating remaining position in {}'.format(
+                symbol)
+            )
+            api.submit_order(
+                symbol=symbol, qty=position.qty, side='sell',
+                type='market', time_in_force='day'
+            )
+            symbols.remove(symbol)
+            if len(symbols) <= 0:
+                conn.close()
+            conn.deregister([
+                'A.{}'.format(symbol),
+                'AM.{}'.format(symbol)
+            ])
 
     # Replace aggregated 1s bars with incoming 1m bars
     @conn.on(r'AM\..*')
@@ -352,13 +355,23 @@ def run_ws(conn, channels):
 
 
 if __name__ == "__main__":
-    # Wait until just before we might want to trade
+    # Get when the market opens or opened today
     nyc = timezone('America/New_York')
-    market_open = api.get_clock().next_open
+    today = datetime.today().astimezone(nyc)
+    today_str = datetime.today().astimezone(nyc).strftime('%Y-%m-%d')
+    calendar = api.get_calendar(start=today_str, end=today_str)[0]
+    market_open = today.replace(
+        hour=calendar.open.hour,
+        minute=calendar.open.minute,
+        second=0
+    )
     market_open = market_open.astimezone(nyc)
+
+    # Wait until just before we might want to trade
     current_dt = datetime.today().astimezone(nyc)
     since_market_open = current_dt - market_open
     while since_market_open.seconds // 60 <= 14:
         time.sleep(1)
+        since_market_open = current_dt - market_open
 
     run(get_tickers(), market_open)
