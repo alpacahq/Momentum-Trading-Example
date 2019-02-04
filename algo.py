@@ -70,7 +70,7 @@ def find_stop(current_value, minute_history, now):
     return current_value * default_stop
 
 
-def run(tickers, market_open_dt):
+def run(tickers, market_open_dt, market_close_dt):
     # Establish streaming connection
     conn = tradeapi.StreamConn(key_id=api_key_id, secret_key=api_secret)
 
@@ -191,6 +191,7 @@ def run(tickers, market_open_dt):
 
         # Now we check to see if it might be time to buy or sell
         since_market_open = ts - market_open_dt
+        until_market_close = market_close_dt - ts
         if (
             since_market_open.seconds // 60 > 15 and
             since_market_open.seconds // 60 < 60
@@ -265,7 +266,7 @@ def run(tickers, market_open_dt):
                 return
         if(
             since_market_open.seconds // 60 >= 24 and
-            since_market_open.seconds // 60 < 359
+            until_market_close.seconds // 60 > 15
         ):
             # Check for liquidation signals
 
@@ -299,7 +300,7 @@ def run(tickers, market_open_dt):
                     print(e)
             return
         elif (
-            since_market_open.seconds // 60 >= 359
+            until_market_close.seconds // 60 <= 15
         ):
             # Liquidate remaining positions on watched symbols at market
             try:
@@ -366,6 +367,12 @@ if __name__ == "__main__":
         second=0
     )
     market_open = market_open.astimezone(nyc)
+    market_close = today.replace(
+        hour=calendar.close.hour,
+        minute=calendar.close.minute,
+        second=0
+    )
+    market_close = market_close.astimezone(nyc)
 
     # Wait until just before we might want to trade
     current_dt = datetime.today().astimezone(nyc)
@@ -374,4 +381,4 @@ if __name__ == "__main__":
         time.sleep(1)
         since_market_open = current_dt - market_open
 
-    run(get_tickers(), market_open)
+    run(get_tickers(), market_open, market_close)
