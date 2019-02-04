@@ -263,7 +263,7 @@ def run(tickers, market_open_dt):
                 return
         if(
             since_market_open.seconds // 60 >= 24 and
-            since_market_open.seconds // 60 < 360
+            since_market_open.seconds // 60 < 359
         ):
             # Check for liquidation signals
 
@@ -296,6 +296,28 @@ def run(tickers, market_open_dt):
                 except Exception as e:
                     print(e)
             return
+        elif (
+            since_market_open.seconds // 60 >= 359
+        ):
+            print('Trading over, liquidating remaining positions...')
+
+            # Cancel any existing open orders on watched symbols
+            existing_orders = api.list_orders(limit=500)
+            for order in existing_orders:
+                if order.symbol in symbols:
+                    api.cancel_order(order.id)
+
+            # Liquidate remaining positions on watched symbols at market
+            positions = api.list_positions()
+            for position in existing_positions:
+                if position.symbol in symbols:
+                    api.submit_order(
+                        symbol=symbol, qty=str(position.qty), side='sell',
+                        type='market', time_in_force='day'
+                    )
+
+            print('Execution complete.')
+            conn.close()
 
     # Replace aggregated 1s bars with incoming 1m bars
     @conn.on(r'AM\..*')
