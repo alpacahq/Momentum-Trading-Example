@@ -23,7 +23,7 @@ session = requests.session()
 min_share_price = 2.0
 max_share_price = 13.0
 # Minimum previous-day dollar volume for a stock we might consider
-min_last_dv = 10000000
+min_last_dv = 500000
 # Stop limit to default to
 default_stop = .95
 # How much of our portfolio to allocate to any one position
@@ -206,7 +206,13 @@ def run(tickers, market_open_dt, market_close_dt):
             # See how high the price went during the first 15 minutes
             lbound = market_open_dt
             ubound = lbound + timedelta(minutes=15)
-            high_15m = minute_history[symbol][lbound:ubound]['high'].max()
+            high_15m = 0
+            try:
+                high_15m = minute_history[symbol][lbound:ubound]['high'].max()
+            except Exception as e:
+                # Because we're aggregating on the fly, sometimes the datetime
+                # index can get messy until it's healed by the minute bars
+                return
 
             # Get the change since yesterday's market close
             daily_pct_change = (
@@ -253,6 +259,9 @@ def run(tickers, market_open_dt, market_close_dt):
                 if shares_to_buy <= 0:
                     return
 
+                print('Submitting buy for {} shares of {} at {}'.format(
+                    shares_to_buy, symbol, data.close
+                ))
                 try:
                     o = api.submit_order(
                         symbol=symbol, qty=str(shares_to_buy), side='buy',
@@ -288,6 +297,9 @@ def run(tickers, market_open_dt, market_close_dt):
                 (data.close >= target_prices[symbol] and hist[-1] <= 0) or
                 (data.close <= latest_cost_basis[symbol] and hist[-1] <= 0)
             ):
+                print('Submitting sell for {} shares of {} at {}'.format(
+                    position, symbol, data.close
+                ))
                 try:
                     o = api.submit_order(
                         symbol=symbol, qty=str(position), side='sell',
