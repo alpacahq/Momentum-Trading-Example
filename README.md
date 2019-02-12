@@ -4,7 +4,7 @@ An example algorithm for a momentum-based day trading strategy. This script uses
 
 ## Running the Script
 
-Note that near the top of the file, there are placeholders for your API information - your key ID, your secret key, and the URL you want to connect to. You can get all that information from the Alpaca dashboard. Replace the placeholder strings with your own information, and the script is ready to run with `python algo.py`. Please note that running with Python 3.6 is required.
+Note that near the top of the file, there are placeholders for your API information - your key ID, your secret key, and the URL you want to connect to. You can get all that information from the Alpaca dashboard. Replace the placeholder strings with your own information, and the script is ready to run with `python algo.py`. **Please note that running with Python 3.6 is required.**
 
 ## Algorithm Logic
 
