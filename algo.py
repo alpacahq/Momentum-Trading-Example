@@ -132,7 +132,7 @@ def run(tickers, market_open_dt, market_close_dt):
                 partial_fills[symbol] = qty
                 positions[symbol] += qty
                 open_orders[symbol] = data.order
-            elif event == 'filled':
+            elif event == 'fill':
                 qty = data.order['filled_qty']
                 if data.order['side'] == 'sell':
                     qty = qty * -1
