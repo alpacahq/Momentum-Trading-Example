@@ -5,11 +5,12 @@ from ta import macd
 import numpy as np
 from datetime import datetime, timedelta
 from pytz import timezone
+import os
 
 # Replace these with your API connection info from the dashboard
-base_url = 'Your API URL'
-api_key_id = 'Your API Key'
-api_secret = 'Your API Secret'
+base_url = os.environ.get('APCA_API_BASE_URL', 'https://paper-api.alpaca.markets'))
+api_key_id = os.environ.get('APCA_API_KEY_ID')
+api_secret = os.environ.get('APCA_API_SECRET_KEY')
 
 api = tradeapi.REST(
     base_url=base_url,
