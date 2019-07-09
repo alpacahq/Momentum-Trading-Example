@@ -72,7 +72,7 @@ def find_stop(current_value, minute_history, now):
 
 def run(tickers, market_open_dt, market_close_dt):
     # Establish streaming connection
-    conn = tradeapi.StreamConn(key_id=api_key_id, secret_key=api_secret)
+    conn = tradeapi.StreamConn(base_url=base_url, key_id=api_key_id, secret_key=api_secret)
 
     # Update initial state with information from tickers
     volume_today = {}
