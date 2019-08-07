@@ -1,7 +1,3 @@
-#import os
-#import sys
-#_cwd = os.path.dirname(os.path.realpath(__file__))
-#sys.path.append(os.path.realpath(os.path.join(_cwd, '..', 'alpaca-trade-api-python')))
 import alpaca_trade_api as tradeapi
 import requests
 import time
