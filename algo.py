@@ -1,3 +1,7 @@
+#import os
+#import sys
+#_cwd = os.path.dirname(os.path.realpath(__file__))
+#sys.path.append(os.path.realpath(os.path.join(_cwd, '..', 'alpaca-trade-api-python')))
 import alpaca_trade_api as tradeapi
 import requests
 import time
@@ -8,7 +12,7 @@ from pytz import timezone
 import os
 
 # Replace these with your API connection info from the dashboard
-base_url = os.environ.get('APCA_API_BASE_URL', 'https://paper-api.alpaca.markets'))
+base_url = os.environ.get('APCA_API_BASE_URL', 'https://paper-api.alpaca.markets')
 api_key_id = os.environ.get('APCA_API_KEY_ID')
 api_secret = os.environ.get('APCA_API_SECRET_KEY')
 
@@ -49,7 +53,9 @@ def get_tickers():
     print('Getting current ticker data...')
     tickers = api.polygon.all_tickers()
     print('Success.')
+    print('Getting list of assets...')
     assets = api.list_assets()
+    print('Success.')
     symbols = [asset.symbol for asset in assets if asset.tradable]
     return [ticker for ticker in tickers if (
         ticker.ticker in symbols and
@@ -147,7 +153,7 @@ def run(tickers, market_open_dt, market_close_dt):
                 partial_fills[symbol] = 0
                 open_orders[symbol] = None
 
-    @conn.on(r'A\..*')
+    @conn.on(r'A')
     async def handle_second_bar(conn, channel, data):
         symbol = data.symbol
 
@@ -191,8 +197,8 @@ def run(tickers, market_open_dt, market_close_dt):
             return
 
         # Now we check to see if it might be time to buy or sell
-        since_market_open = ts - market_open_dt
-        until_market_close = market_close_dt - ts
+        since_market_open = ts.astimezone(nyc) - market_open_dt
+        until_market_close = market_close_dt - ts.astimezone(nyc)
         if (
             since_market_open.seconds // 60 > 15 and
             since_market_open.seconds // 60 < 60
@@ -337,7 +343,7 @@ def run(tickers, market_open_dt, market_close_dt):
             ])
 
     # Replace aggregated 1s bars with incoming 1m bars
-    @conn.on(r'AM\..*')
+    @conn.on(r'AM')
     async def handle_minute_bar(conn, channel, data):
         ts = data.start
         ts -= timedelta(microseconds=ts.microsecond)
@@ -392,6 +398,7 @@ if __name__ == "__main__":
     since_market_open = current_dt - market_open
     while since_market_open.seconds // 60 <= 14:
         time.sleep(1)
+        current_dt = datetime.today().astimezone(nyc)
         since_market_open = current_dt - market_open
 
     run(get_tickers(), market_open, market_close)
