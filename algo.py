@@ -146,7 +146,7 @@ def run(tickers, market_open_dt, market_close_dt):
                 partial_fills[symbol] = 0
                 open_orders[symbol] = None
 
-    @conn.on(r'A\..*')
+    @conn.on(r'A$')
     async def handle_second_bar(conn, channel, data):
         symbol = data.symbol
 
@@ -336,7 +336,7 @@ def run(tickers, market_open_dt, market_close_dt):
             ])
 
     # Replace aggregated 1s bars with incoming 1m bars
-    @conn.on(r'AM\..*')
+    @conn.on(r'AM$')
     async def handle_minute_bar(conn, channel, data):
         ts = data.start
         ts -= timedelta(microseconds=ts.microsecond)
