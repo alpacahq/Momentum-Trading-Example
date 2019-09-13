@@ -363,7 +363,7 @@ def run_ws(conn, channels):
         conn.run(channels)
     except Exception as e:
         print(e)
-        conn.close
+        conn.close()
         run_ws(conn, channels)
 
 
