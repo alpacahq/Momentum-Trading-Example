@@ -1,7 +1,7 @@
 import alpaca_trade_api as tradeapi
 import requests
 import time
-from ta import macd
+from ta.trend import macd
 import numpy as np
 from datetime import datetime, timedelta
 from pytz import timezone
