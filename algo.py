@@ -56,17 +56,17 @@ def get_tickers():
     assets = api.list_assets()
     symbols = [asset.symbol for asset in assets if asset.tradable]
     return [ticker for ticker in tickers if (
-        ticker.ticker in symbols and
-        ticker.lastTrade['p'] >= min_share_price and
-        ticker.lastTrade['p'] <= max_share_price and
-        ticker.prevDay['v'] * ticker.lastTrade['p'] > min_last_dv and
-        ticker.todaysChangePerc >= 3.5
+            ticker.ticker in symbols and
+            ticker.lastTrade['p'] >= min_share_price and
+            ticker.lastTrade['p'] <= max_share_price and
+            ticker.prevDay['v'] * ticker.lastTrade['p'] > min_last_dv and
+            ticker.todaysChangePerc >= 3.5
     )]
 
 
 def find_stop(current_value, minute_history, now):
     series = minute_history['low'][-100:] \
-                .dropna().resample('5min').min()
+        .dropna().resample('5min').min()
     series = series[now.floor('1D'):]
     diff = np.diff(series.values)
     low_index = np.where((diff[:-1] <= 0) & (diff[1:] > 0))[0] + 1
@@ -77,7 +77,8 @@ def find_stop(current_value, minute_history, now):
 
 def run(tickers, market_open_dt, market_close_dt):
     # Establish streaming connection
-    conn = tradeapi.StreamConn(base_url=base_url, key_id=api_key_id, secret_key=api_secret)
+    conn = tradeapi.StreamConn(base_url=base_url, key_id=api_key_id,
+                               secret_key=api_secret)
 
     # Update initial state with information from tickers
     volume_today = {}
@@ -113,7 +114,7 @@ def run(tickers, market_open_dt, market_close_dt):
             # Recalculate cost basis and stop price
             latest_cost_basis[position.symbol] = float(position.cost_basis)
             stop_prices[position.symbol] = (
-                float(position.cost_basis) * default_stop
+                    float(position.cost_basis) * default_stop
             )
 
     # Keep track of what we're buying/selling
@@ -132,7 +133,7 @@ def run(tickers, market_open_dt, market_close_dt):
                 if data.order['side'] == 'sell':
                     qty = qty * -1
                 positions[symbol] = (
-                    positions.get(symbol, 0) - partial_fills.get(symbol, 0)
+                        positions.get(symbol, 0) - partial_fills.get(symbol, 0)
                 )
                 partial_fills[symbol] = qty
                 positions[symbol] += qty
@@ -142,7 +143,7 @@ def run(tickers, market_open_dt, market_close_dt):
                 if data.order['side'] == 'sell':
                     qty = qty * -1
                 positions[symbol] = (
-                    positions.get(symbol, 0) - partial_fills.get(symbol, 0)
+                        positions.get(symbol, 0) - partial_fills.get(symbol, 0)
                 )
                 partial_fills[symbol] = 0
                 positions[symbol] += qty
@@ -198,8 +199,8 @@ def run(tickers, market_open_dt, market_close_dt):
         since_market_open = ts - market_open_dt
         until_market_close = market_close_dt - ts
         if (
-            since_market_open.seconds // 60 > 15 and
-            since_market_open.seconds // 60 < 60
+                since_market_open.seconds // 60 > 15 and
+                since_market_open.seconds // 60 < 60
         ):
             # Check for buy signals
 
@@ -221,12 +222,12 @@ def run(tickers, market_open_dt, market_close_dt):
 
             # Get the change since yesterday's market close
             daily_pct_change = (
-                (data.close - prev_closes[symbol]) / prev_closes[symbol]
+                    (data.close - prev_closes[symbol]) / prev_closes[symbol]
             )
             if (
-                daily_pct_change > .04 and
-                data.close > high_15m and
-                volume_today[symbol] > 30000
+                    daily_pct_change > .04 and
+                    data.close > high_15m and
+                    volume_today[symbol] > 30000
             ):
                 # check for a positive, increasing MACD
                 hist = macd(
@@ -235,8 +236,8 @@ def run(tickers, market_open_dt, market_close_dt):
                     n_slow=26
                 )
                 if (
-                    hist[-1] < 0 or
-                    not (hist[-3] < hist[-2] < hist[-1])
+                        hist[-1] < 0 or
+                        not (hist[-3] < hist[-2] < hist[-1])
                 ):
                     return
                 hist = macd(
@@ -253,10 +254,10 @@ def run(tickers, market_open_dt, market_close_dt):
                 )
                 stop_prices[symbol] = stop_price
                 target_prices[symbol] = data.close + (
-                    (data.close - stop_price) * 3
+                        (data.close - stop_price) * 3
                 )
                 shares_to_buy = portfolio_value * risk // (
-                    data.close - stop_price
+                        data.close - stop_price
                 )
                 if shares_to_buy == 0:
                     shares_to_buy = 1
@@ -278,9 +279,9 @@ def run(tickers, market_open_dt, market_close_dt):
                 except Exception as e:
                     print(e)
                 return
-        if(
-            since_market_open.seconds // 60 >= 24 and
-            until_market_close.seconds // 60 > 15
+        if (
+                since_market_open.seconds // 60 >= 24 and
+                until_market_close.seconds // 60 > 15
         ):
             # Check for liquidation signals
 
@@ -298,9 +299,9 @@ def run(tickers, market_open_dt, market_close_dt):
                 n_slow=21
             )
             if (
-                data.close <= stop_prices[symbol] or
-                (data.close >= target_prices[symbol] and hist[-1] <= 0) or
-                (data.close <= latest_cost_basis[symbol] and hist[-1] <= 0)
+                    data.close <= stop_prices[symbol] or
+                    (data.close >= target_prices[symbol] and hist[-1] <= 0) or
+                    (data.close <= latest_cost_basis[symbol] and hist[-1] <= 0)
             ):
                 print('Submitting sell for {} shares of {} at {}'.format(
                     position, symbol, data.close
@@ -317,7 +318,7 @@ def run(tickers, market_open_dt, market_close_dt):
                     print(e)
             return
         elif (
-            until_market_close.seconds // 60 <= 15
+                until_market_close.seconds // 60 <= 15
         ):
             # Liquidate remaining positions on watched symbols at market
             try:
