@@ -17,3 +17,4 @@ threadpoolctl==2.2.0
 urllib3==1.26.6
 websocket-client==1.1.1
 websockets==9.1
+pyyaml==5.4.1
