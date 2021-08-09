@@ -1,15 +1,20 @@
 import alpaca_trade_api as tradeapi
 import requests
 import time
-from ta import macd
+
+import yaml
+from ta.trend import macd
 import numpy as np
 from datetime import datetime, timedelta
 from pytz import timezone
 
 # Replace these with your API connection info from the dashboard
-base_url = 'Your API URL'
-api_key_id = 'Your API Key'
-api_secret = 'Your API Secret'
+with open("./config.yaml", mode='r') as f:
+    o = yaml.safe_load(f)
+    api_key_id = o.get("key_id")
+    api_secret = o.get("secret")
+    base_url = o.get("base_url")
+    feed = o.get("feed")
 
 api = tradeapi.REST(
     base_url=base_url,
