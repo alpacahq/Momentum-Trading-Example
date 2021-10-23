@@ -20,6 +20,7 @@ from pytz import timezone
 from loguru import logger
 from concurrent.futures import ThreadPoolExecutor
 
+
 # Replace these with your API connection info from the dashboard
 with open("./config.yaml", mode='r') as f:
     o = yaml.safe_load(f)
@@ -128,6 +129,7 @@ def find_stop(current_value, minute_history, now):
     if len(low_index) > 0:
         return series[low_index[-1]] - 0.01
     return current_value * default_stop
+
 
 
 def run(tickers, market_open_dt, market_close_dt):
