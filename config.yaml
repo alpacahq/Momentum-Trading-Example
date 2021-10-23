@@ -1,0 +1,4 @@
+key_id: "<YOUR-KEY-ID>"
+secret: "<YOUR-SECRET-KEY>"
+feed: iex
+base_url: https://paper-api.alpaca.markets
